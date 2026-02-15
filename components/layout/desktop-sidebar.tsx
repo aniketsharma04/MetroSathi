@@ -1,0 +1,83 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Home,
+  Search,
+  PlusCircle,
+  Users,
+  UserCircle,
+  TrainFront,
+  MapPin,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/search", label: "Find Companions", icon: Search },
+  { href: "/trips/new", label: "Add Trip", icon: PlusCircle },
+  { href: "/trips", label: "My Trips", icon: MapPin },
+  { href: "/connections", label: "Connections", icon: Users },
+  { href: "/profile", label: "Profile", icon: UserCircle },
+];
+
+interface DesktopSidebarProps {
+  pendingCount?: number;
+}
+
+export function DesktopSidebar({ pendingCount = 0 }: DesktopSidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <aside className="fixed left-0 top-0 hidden h-screen w-60 border-r bg-white md:flex md:flex-col">
+      {/* Logo */}
+      <div className="flex h-16 items-center gap-2.5 border-b px-6">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0066CC]">
+          <TrainFront size={18} className="text-white" />
+        </div>
+        <span className="text-lg font-semibold text-[#1A1A1A]">
+          Metro Connect
+        </span>
+      </div>
+
+      {/* Nav Items */}
+      <nav className="flex flex-1 flex-col gap-1 p-4">
+        {navItems.map((item) => {
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/dashboard" &&
+              item.href !== "/trips/new" &&
+              pathname.startsWith(item.href));
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-[#E6F2FF] text-[#0066CC]"
+                  : "text-[#666666] hover:bg-[#F8F9FA] hover:text-[#1A1A1A]"
+              )}
+            >
+              <Icon size={20} />
+              <span>{item.label}</span>
+              {item.href === "/connections" && pendingCount > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#EF4444] px-1.5 text-[11px] font-bold text-white">
+                  {pendingCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom section */}
+      <div className="border-t p-4">
+        <p className="text-xs text-[#999999]">Metro Connect v1.0</p>
+      </div>
+    </aside>
+  );
+}
