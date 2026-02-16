@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  isWithinStations,
   getTimeDiffMinutes,
   getMatchQuality,
 } from "@/lib/matching";
-
-const STATION_THRESHOLD = 5;
-const TIME_THRESHOLD_MINUTES = 30;
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -56,31 +52,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Filter and score results
+  // Filter by gender only, then score and sort all results by match quality
   const results = (trips ?? [])
     .filter((trip) => {
-      // Gender filter
       if (genderFilter !== "All" && trip.user?.gender !== genderFilter) {
         return false;
       }
-
-      // Station proximity check
-      const startMatch = isWithinStations(
-        startStation,
-        trip.start_station,
-        STATION_THRESHOLD
-      );
-      const endMatch = isWithinStations(
-        endStation,
-        trip.end_station,
-        STATION_THRESHOLD
-      );
-      if (!startMatch || !endMatch) return false;
-
-      // Time proximity check
-      const timeDiff = getTimeDiffMinutes(travelTime, trip.travel_time);
-      if (timeDiff > TIME_THRESHOLD_MINUTES) return false;
-
       return true;
     })
     .map((trip) => {
@@ -92,6 +69,10 @@ export async function GET(request: Request) {
       );
       const timeDiff = getTimeDiffMinutes(travelTime, trip.travel_time);
 
+      // Cap Infinity distances to 100 for scoring
+      const startDist = matchQuality.startDist === Infinity ? 100 : matchQuality.startDist;
+      const endDist = matchQuality.endDist === Infinity ? 100 : matchQuality.endDist;
+
       return {
         ...trip,
         match_quality: matchQuality.label,
@@ -99,8 +80,7 @@ export async function GET(request: Request) {
         end_distance: matchQuality.endDist,
         time_diff: timeDiff,
         // Sort score: lower is better
-        sort_score:
-          matchQuality.startDist + matchQuality.endDist + timeDiff * 0.1,
+        sort_score: startDist + endDist + timeDiff * 0.1,
       };
     })
     .sort((a, b) => a.sort_score - b.sort_score);

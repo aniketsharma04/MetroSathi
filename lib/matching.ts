@@ -75,9 +75,10 @@ export function getMatchQuality(
     return { startDist, endDist, label: "Exact route match" };
   }
 
-  const maxDist = Math.max(
-    startDist === Infinity ? 0 : startDist,
-    endDist === Infinity ? 0 : endDist
-  );
+  if (startDist === Infinity || endDist === Infinity) {
+    return { startDist, endDist, label: "Different route" };
+  }
+
+  const maxDist = Math.max(startDist, endDist);
   return { startDist, endDist, label: `±${maxDist} station${maxDist !== 1 ? "s" : ""}` };
 }

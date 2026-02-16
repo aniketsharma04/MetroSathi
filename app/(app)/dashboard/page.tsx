@@ -16,6 +16,19 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 
+interface ActivityItem {
+  id: string;
+  start_station: string;
+  end_station: string;
+  travel_date: string;
+  created_at: string;
+  user: {
+    id: string;
+    name: string;
+    profile_pic_url: string | null;
+  };
+}
+
 interface DashboardTrip {
   id: string;
   start_station: string;
@@ -74,6 +87,7 @@ function formatDate(dateStr: string) {
 export default function DashboardPage() {
   const { profile } = useAuth();
   const [trips, setTrips] = useState<DashboardTrip[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     tripCount: 0,
     connectionCount: 0,
@@ -84,9 +98,10 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       // Fetch trips and connections in parallel
-      const [tripsRes, connRes] = await Promise.all([
+      const [tripsRes, connRes, activityRes] = await Promise.all([
         fetch("/api/trips"),
         fetch("/api/connections"),
+        fetch("/api/activity"),
       ]);
 
       if (tripsRes.ok) {
@@ -102,6 +117,11 @@ export default function DashboardPage() {
           connectionCount: connData.accepted?.length ?? 0,
           pendingCount: connData.pendingCount ?? 0,
         }));
+      }
+
+      if (activityRes.ok) {
+        const activityData = await activityRes.json();
+        setActivity(activityData.items ?? []);
       }
 
       setLoading(false);
@@ -249,6 +269,60 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Connection Activity */}
+      {!loading && activity.length > 0 && (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[#1A1A1A]">
+              Connection Activity
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {activity.slice(0, 5).map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+              >
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
+                  {item.user.profile_pic_url ? (
+                    <img
+                      src={item.user.profile_pic_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-xs font-bold text-white">
+                      {item.user.name?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-[#1A1A1A]">
+                    <span className="font-semibold">{item.user.name}</span>{" "}
+                    added{" "}
+                    <span className="font-medium">{item.start_station}</span>
+                    {" → "}
+                    <span className="font-medium">{item.end_station}</span>
+                    {" on "}
+                    <span className="font-medium">{formatDate(item.travel_date)}</span>
+                  </p>
+                </div>
+                <Link href={`/connections?chat=${item.user.id}`}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 shrink-0 gap-1.5 text-xs"
+                  >
+                    <MessageCircle size={14} />
+                    Message
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* How it Works (only show when no trips yet) */}
       {!loading && trips.length === 0 && (

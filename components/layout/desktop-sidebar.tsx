@@ -13,6 +13,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/notification-bell";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
@@ -77,8 +78,9 @@ export function DesktopSidebar({ pendingCount = 0 }: DesktopSidebarProps) {
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t p-4">
+      <div className="flex items-center justify-between border-t p-4">
         <p className="text-xs text-[#999999]">Metro Connect v1.0</p>
+        <NotificationBell />
       </div>
     </aside>
   );

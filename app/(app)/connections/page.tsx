@@ -11,6 +11,7 @@ import {
   Loader2,
   Search,
   Clock,
+  UserSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -204,7 +205,7 @@ function ConnectionsPageContent() {
       {/* Mobile: Full view or Chat overlay */}
       <div className="md:hidden">
         {activeChatUser && activeChatConnection ? (
-          <div className="fixed inset-0 z-50 flex flex-col bg-[#F8F9FA]" style={{ height: "100dvh" }}>
+          <div className="fixed inset-0 z-[60] flex flex-col bg-[#F8F9FA]" style={{ height: "100dvh" }}>
             <ChatWindow
               connectionId={activeChatConnection.id}
               otherUser={activeChatUser}
@@ -213,13 +214,21 @@ function ConnectionsPageContent() {
           </div>
         ) : (
           <>
-            <div>
-              <h1 className="text-2xl font-semibold text-[#1A1A1A]">
-                Connections
-              </h1>
-              <p className="mt-1 text-sm text-[#666666]">
-                Manage your travel connections
-              </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-[#1A1A1A]">
+                  Connections
+                </h1>
+                <p className="mt-1 text-sm text-[#666666]">
+                  Manage your travel connections
+                </p>
+              </div>
+              <Link href="/people">
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <UserSearch size={14} />
+                  Find People
+                </Button>
+              </Link>
             </div>
 
             <ConnectionsTabs
