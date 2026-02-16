@@ -78,6 +78,19 @@ create table public.reports (
 );
 
 -- ============================================
+-- TRIP JOIN REQUESTS TABLE
+-- ============================================
+create table public.trip_join_requests (
+  id uuid default uuid_generate_v4() primary key,
+  trip_id uuid references public.trips(id) on delete cascade not null,
+  requester_id uuid references public.profiles(id) on delete cascade not null,
+  status text default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(trip_id, requester_id)
+);
+
+-- ============================================
 -- INDEXES
 -- ============================================
 create index idx_trips_user_id on public.trips(user_id);
@@ -89,6 +102,9 @@ create index idx_connections_status on public.connections(status);
 create index idx_messages_connection on public.messages(connection_id);
 create index idx_messages_created on public.messages(created_at);
 create index idx_reports_status on public.reports(status);
+create index idx_join_requests_trip on public.trip_join_requests(trip_id);
+create index idx_join_requests_requester on public.trip_join_requests(requester_id);
+create index idx_join_requests_status on public.trip_join_requests(status);
 
 -- ============================================
 -- ROW LEVEL SECURITY
@@ -169,6 +185,52 @@ create policy "Users can send messages in accepted connections"
     )
   );
 
+-- Trip Join Requests
+alter table public.trip_join_requests enable row level security;
+
+create policy "Users can view own or owned trip join requests"
+  on public.trip_join_requests for select
+  using (
+    auth.uid() = requester_id
+    or exists (
+      select 1 from public.trips
+      where trips.id = trip_join_requests.trip_id
+      and trips.user_id = auth.uid()
+    )
+  );
+
+create policy "Non-owners can request to join trips"
+  on public.trip_join_requests for insert
+  with check (
+    auth.uid() = requester_id
+    and not exists (
+      select 1 from public.trips
+      where trips.id = trip_join_requests.trip_id
+      and trips.user_id = auth.uid()
+    )
+  );
+
+create policy "Trip owners can update join requests"
+  on public.trip_join_requests for update
+  using (
+    exists (
+      select 1 from public.trips
+      where trips.id = trip_join_requests.trip_id
+      and trips.user_id = auth.uid()
+    )
+  );
+
+create policy "Either party can delete join requests"
+  on public.trip_join_requests for delete
+  using (
+    auth.uid() = requester_id
+    or exists (
+      select 1 from public.trips
+      where trips.id = trip_join_requests.trip_id
+      and trips.user_id = auth.uid()
+    )
+  );
+
 -- Reports: users can create reports and view their own
 alter table public.reports enable row level security;
 
@@ -235,6 +297,10 @@ create trigger set_profiles_updated_at
 
 create trigger set_connections_updated_at
   before update on public.connections
+  for each row execute procedure public.handle_updated_at();
+
+create trigger set_join_requests_updated_at
+  before update on public.trip_join_requests
   for each row execute procedure public.handle_updated_at();
 
 -- ============================================

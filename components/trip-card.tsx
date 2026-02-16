@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Clock, ArrowRight, UserPlus, MessageCircle, Loader2 } from "lucide-react";
+import { MapPin, Clock, ArrowRight, UserPlus, MessageCircle, Loader2, Train } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UserProfile } from "@/lib/types";
 
@@ -23,6 +23,9 @@ interface TripCardProps {
   onMessage?: () => void;
   onCardClick?: () => void;
   connecting?: boolean;
+  joinRequestStatus?: "none" | "pending" | "accepted" | "rejected";
+  onJoinJourney?: () => void;
+  joiningJourney?: boolean;
 }
 
 export function TripCard({
@@ -36,6 +39,9 @@ export function TripCard({
   onMessage,
   onCardClick,
   connecting,
+  joinRequestStatus = "none",
+  onJoinJourney,
+  joiningJourney,
 }: TripCardProps) {
   const initials = user.name
     ? user.name
@@ -116,8 +122,8 @@ export function TripCard({
             </span>
           </div>
 
-          {/* Action Button */}
-          <div className="pt-1">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 pt-1">
             {connectionStatus === "none" && (
               <Button
                 size="sm"
@@ -157,6 +163,35 @@ export function TripCard({
               >
                 <MessageCircle size={14} />
                 Message
+              </Button>
+            )}
+            {joinRequestStatus === "none" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 border-[#0066CC] text-xs text-[#0066CC] hover:bg-[#E6F2FF]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onJoinJourney?.();
+                }}
+                disabled={joiningJourney}
+              >
+                {joiningJourney ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Train size={14} />
+                )}
+                Join Journey
+              </Button>
+            )}
+            {joinRequestStatus === "pending" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled
+              >
+                Requested
               </Button>
             )}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -12,12 +12,18 @@ interface ChatWindowProps {
   connectionId: string;
   otherUser: UserProfile;
   onBack: () => void;
+  isConnected?: boolean;
+  onSendConnectionRequest?: () => void;
+  sendingConnectionRequest?: boolean;
 }
 
 export function ChatWindow({
   connectionId,
   otherUser,
   onBack,
+  isConnected = true,
+  onSendConnectionRequest,
+  sendingConnectionRequest,
 }: ChatWindowProps) {
   const { user } = useAuth();
   const supabase = createClient();
@@ -54,24 +60,27 @@ export function ChatWindow({
     setLoading(false);
   }, [connectionId, loading]);
 
-  // Initial fetch
+  // Initial fetch (skip if not connected)
   useEffect(() => {
-    fetchMessages();
-  }, [connectionId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isConnected) fetchMessages();
+    else setLoading(false);
+  }, [connectionId, isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Polling fallback for real-time messages (every 3s)
+  // Polling fallback for real-time messages (every 3s, skip if not connected)
   useEffect(() => {
+    if (!isConnected) return;
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
-  }, [fetchMessages]);
+  }, [fetchMessages, isConnected]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Subscribe to realtime messages
+  // Subscribe to realtime messages (skip if not connected)
   useEffect(() => {
+    if (!isConnected) return;
     const channel = supabase
       .channel(`messages:${connectionId}`)
       .on(
@@ -96,7 +105,7 @@ export function ChatWindow({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [connectionId, supabase]);
+  }, [connectionId, supabase, isConnected]);
 
   const handleSend = async () => {
     if (!input.trim() || sending || !user) return;
@@ -188,8 +197,40 @@ export function ChatWindow({
         </div>
       </div>
 
+      {/* Not connected state */}
+      {!isConnected && (
+        <>
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 text-center">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FEF3C7]">
+              <UserPlus size={24} className="text-[#D97706]" />
+            </div>
+            <p className="text-sm font-medium text-[#1A1A1A]">
+              Not connected
+            </p>
+            <p className="mt-1 text-xs text-[#666666]">
+              Send a connection request to start chatting with{" "}
+              {otherUser.name.split(" ")[0]}
+            </p>
+          </div>
+          <div className="border-t bg-[#FFFBEB] px-4 py-3 pb-safe">
+            <Button
+              className="w-full gap-2 bg-[#D97706] text-sm hover:bg-[#B45309]"
+              onClick={onSendConnectionRequest}
+              disabled={sendingConnectionRequest}
+            >
+              {sendingConnectionRequest ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <UserPlus size={16} />
+              )}
+              Send Connection Request
+            </Button>
+          </div>
+        </>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      {isConnected && <div className="flex-1 overflow-y-auto px-4 py-4">
         {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-[#0066CC]" />
@@ -282,10 +323,10 @@ export function ChatWindow({
           ))}
 
         <div ref={messagesEndRef} />
-      </div>
+      </div>}
 
       {/* Input */}
-      <div className="border-t bg-white px-4 py-3 pb-safe">
+      {isConnected && <div className="border-t bg-white px-4 py-3 pb-safe">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -317,7 +358,7 @@ export function ChatWindow({
             )}
           </Button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

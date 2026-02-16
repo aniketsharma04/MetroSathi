@@ -140,6 +140,12 @@ function ConnectionsPageContent() {
     router.replace("/connections", { scroll: false });
   };
 
+  // Unconnected chat user state
+  const [unconnectedUser, setUnconnectedUser] = useState<UserProfile | null>(
+    null
+  );
+  const [sendingConnection, setSendingConnection] = useState(false);
+
   // Find the active chat connection and user
   const activeChatConnection = activeChatUserId
     ? accepted.find((c) => {
@@ -150,6 +156,52 @@ function ConnectionsPageContent() {
   const activeChatUser = activeChatConnection
     ? getOtherUser(activeChatConnection)
     : null;
+
+  // If chat user is set but no accepted connection, fetch their profile
+  useEffect(() => {
+    if (!activeChatUserId || activeChatConnection || loading) {
+      setUnconnectedUser(null);
+      return;
+    }
+
+    // Check if user exists in pending/sent connections
+    const inPending = pending.find(
+      (c) => c.requester_id === activeChatUserId
+    );
+    const inSent = sent.find((c) => c.recipient_id === activeChatUserId);
+    if (inPending || inSent) {
+      setUnconnectedUser(null);
+      return;
+    }
+
+    // Fetch profile for unconnected user
+    fetch(`/api/people/${activeChatUserId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (profile) setUnconnectedUser(profile);
+      })
+      .catch(() => {});
+  }, [activeChatUserId, activeChatConnection, loading, pending, sent]);
+
+  const handleSendConnectionRequest = async () => {
+    if (!activeChatUserId) return;
+    setSendingConnection(true);
+
+    const res = await fetch("/api/connections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient_id: activeChatUserId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(data.error || "Failed to send connection request");
+    } else {
+      toast.success("Connection request sent!");
+      fetchConnections();
+    }
+    setSendingConnection(false);
+  };
 
   const defaultTab =
     activeChatUserId || (pending.length === 0 && accepted.length > 0)
@@ -162,7 +214,7 @@ function ConnectionsPageContent() {
       <div className="hidden md:block">
         <div className="flex gap-6">
           {/* Left: Connections List */}
-          <div className={`${activeChatUser ? "w-80 shrink-0" : "flex-1"}`}>
+          <div className={`${activeChatUser || unconnectedUser ? "w-80 shrink-0" : "flex-1"}`}>
             <div className="mb-4">
               <h1 className="text-2xl font-semibold text-[#1A1A1A]">
                 Connections
@@ -185,7 +237,7 @@ function ConnectionsPageContent() {
               onOpenProfile={openProfile}
               onOpenChat={openChat}
               getOtherUser={getOtherUser}
-              compact={!!activeChatUser}
+              compact={!!(activeChatUser || unconnectedUser)}
             />
           </div>
 
@@ -196,6 +248,18 @@ function ConnectionsPageContent() {
                 connectionId={activeChatConnection.id}
                 otherUser={activeChatUser}
                 onBack={closeChat}
+              />
+            </div>
+          )}
+          {!activeChatUser && unconnectedUser && (
+            <div className="flex-1 overflow-hidden rounded-xl border border-[#E0E0E0] bg-[#F8F9FA] shadow-sm" style={{ height: "calc(100vh - 140px)" }}>
+              <ChatWindow
+                connectionId=""
+                otherUser={unconnectedUser}
+                onBack={closeChat}
+                isConnected={false}
+                onSendConnectionRequest={handleSendConnectionRequest}
+                sendingConnectionRequest={sendingConnection}
               />
             </div>
           )}
@@ -210,6 +274,17 @@ function ConnectionsPageContent() {
               connectionId={activeChatConnection.id}
               otherUser={activeChatUser}
               onBack={closeChat}
+            />
+          </div>
+        ) : !activeChatUser && unconnectedUser ? (
+          <div className="fixed inset-0 z-[60] flex flex-col bg-[#F8F9FA]" style={{ height: "100dvh" }}>
+            <ChatWindow
+              connectionId=""
+              otherUser={unconnectedUser}
+              onBack={closeChat}
+              isConnected={false}
+              onSendConnectionRequest={handleSendConnectionRequest}
+              sendingConnectionRequest={sendingConnection}
             />
           </div>
         ) : (

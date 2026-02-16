@@ -113,8 +113,61 @@ export async function GET() {
     user: friendProfileMap[msg.sender_id] ?? { id: msg.sender_id, name: "Unknown", profile_pic_url: null },
   }));
 
+  // Fetch pending join requests for the user's trips
+  const { data: userTrips } = await supabase
+    .from("trips")
+    .select("id, start_station, end_station")
+    .eq("user_id", user.id);
+
+  let joinRequestItems: Array<{
+    id: string;
+    trip_id: string;
+    requester_id: string;
+    status: string;
+    created_at: string;
+    requester: { id: string; name: string; profile_pic_url: string | null };
+    trip: { start_station: string; end_station: string };
+  }> = [];
+
+  if (userTrips && userTrips.length > 0) {
+    const tripIds = userTrips.map((t) => t.id);
+    const { data: joinReqs } = await supabase
+      .from("trip_join_requests")
+      .select(
+        `
+        id, trip_id, requester_id, status, created_at,
+        requester:profiles!trip_join_requests_requester_id_fkey (
+          id, name, profile_pic_url
+        )
+      `
+      )
+      .in("trip_id", tripIds)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (joinReqs) {
+      const tripMap: Record<string, { start_station: string; end_station: string }> = {};
+      for (const t of userTrips) {
+        tripMap[t.id] = { start_station: t.start_station, end_station: t.end_station };
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      joinRequestItems = (joinReqs as any[]).map((jr) => ({
+        id: jr.id,
+        trip_id: jr.trip_id,
+        requester_id: jr.requester_id,
+        status: jr.status,
+        created_at: jr.created_at,
+        requester: Array.isArray(jr.requester) ? jr.requester[0] : jr.requester,
+        trip: tripMap[jr.trip_id] ?? { start_station: "Unknown", end_station: "Unknown" },
+      }));
+    }
+  }
+
   return NextResponse.json({
     items: tripsResult.data ?? [],
     messages: messageItems,
+    joinRequests: joinRequestItems,
   });
 }

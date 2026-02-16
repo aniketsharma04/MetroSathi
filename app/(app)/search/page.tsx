@@ -59,6 +59,12 @@ export default function SearchPage() {
   >({});
   const [connectingId, setConnectingId] = useState<string | null>(null);
 
+  // Join request states
+  const [joinRequestMap, setJoinRequestMap] = useState<
+    Record<string, "none" | "pending" | "accepted" | "rejected">
+  >({});
+  const [joiningTripId, setJoiningTripId] = useState<string | null>(null);
+
   // Profile modal
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(
     null
@@ -126,7 +132,47 @@ export default function SearchPage() {
       setConnectionMap(map);
     }
 
+    // Fetch join request statuses
+    if (user && data.length > 0) {
+      const tripIds = data.map((r: SearchResult) => r.id);
+      const jrRes = await fetch(
+        `/api/join-requests/mine?trip_ids=${tripIds.join(",")}`
+      );
+      if (jrRes.ok) {
+        const jrData = await jrRes.json();
+        const jrMap: Record<string, "none" | "pending" | "accepted" | "rejected"> = {};
+        for (const result of data as SearchResult[]) {
+          jrMap[result.id] = jrData[result.id] ?? "none";
+        }
+        setJoinRequestMap(jrMap);
+      }
+    }
+
     setLoading(false);
+  };
+
+  const handleJoinJourney = async (tripId: string) => {
+    if (!user) return;
+
+    setJoiningTripId(tripId);
+    const res = await fetch("/api/join-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trip_id: tripId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      if (res.status === 409) {
+        toast.error("Join request already sent");
+      } else {
+        toast.error(data.error || "Failed to send join request");
+      }
+    } else {
+      toast.success("Join request sent!");
+      setJoinRequestMap((prev) => ({ ...prev, [tripId]: "pending" }));
+    }
+    setJoiningTripId(null);
   };
 
   const handleConnect = async (recipientId: string) => {
@@ -277,6 +323,11 @@ export default function SearchPage() {
               onMessage={() =>
                 router.push(`/connections?chat=${result.user.id}`)
               }
+              joinRequestStatus={
+                joinRequestMap[result.id] ?? "none"
+              }
+              joiningJourney={joiningTripId === result.id}
+              onJoinJourney={() => handleJoinJourney(result.id)}
               onCardClick={() => setSelectedResult(result)}
             />
           ))}

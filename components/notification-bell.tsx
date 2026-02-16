@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, MapPin, ArrowRight, MessageCircle, X } from "lucide-react";
+import { Bell, MapPin, ArrowRight, MessageCircle, X, Train } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -30,9 +30,27 @@ interface MessageItem {
   };
 }
 
+interface JoinRequestItem {
+  id: string;
+  trip_id: string;
+  requester_id: string;
+  status: string;
+  created_at: string;
+  requester: {
+    id: string;
+    name: string;
+    profile_pic_url: string | null;
+  };
+  trip: {
+    start_station: string;
+    end_station: string;
+  };
+}
+
 type NotificationItem =
   | { type: "trip"; data: ActivityItem }
-  | { type: "message"; data: MessageItem };
+  | { type: "message"; data: MessageItem }
+  | { type: "join_request"; data: JoinRequestItem };
 
 function formatDate(dateStr: string) {
   const date = new Date(dateStr + "T00:00:00");
@@ -65,7 +83,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     fetch("/api/activity")
-      .then((res) => (res.ok ? res.json() : { items: [], messages: [] }))
+      .then((res) => (res.ok ? res.json() : { items: [], messages: [], joinRequests: [] }))
       .then((data) => {
         const tripNotifs: NotificationItem[] = (data.items ?? []).map(
           (item: ActivityItem) => ({ type: "trip" as const, data: item })
@@ -73,8 +91,11 @@ export function NotificationBell() {
         const msgNotifs: NotificationItem[] = (data.messages ?? []).map(
           (item: MessageItem) => ({ type: "message" as const, data: item })
         );
+        const jrNotifs: NotificationItem[] = (data.joinRequests ?? []).map(
+          (item: JoinRequestItem) => ({ type: "join_request" as const, data: item })
+        );
         // Merge and sort by created_at descending
-        const all = [...tripNotifs, ...msgNotifs].sort(
+        const all = [...tripNotifs, ...msgNotifs, ...jrNotifs].sort(
           (a, b) =>
             new Date(b.data.created_at).getTime() -
             new Date(a.data.created_at).getTime()
@@ -88,7 +109,7 @@ export function NotificationBell() {
   useEffect(() => {
     const interval = setInterval(() => {
       fetch("/api/activity")
-        .then((res) => (res.ok ? res.json() : { items: [], messages: [] }))
+        .then((res) => (res.ok ? res.json() : { items: [], messages: [], joinRequests: [] }))
         .then((data) => {
           const tripNotifs: NotificationItem[] = (data.items ?? []).map(
             (item: ActivityItem) => ({ type: "trip" as const, data: item })
@@ -96,7 +117,10 @@ export function NotificationBell() {
           const msgNotifs: NotificationItem[] = (data.messages ?? []).map(
             (item: MessageItem) => ({ type: "message" as const, data: item })
           );
-          const all = [...tripNotifs, ...msgNotifs].sort(
+          const jrNotifs: NotificationItem[] = (data.joinRequests ?? []).map(
+            (item: JoinRequestItem) => ({ type: "join_request" as const, data: item })
+          );
+          const all = [...tripNotifs, ...msgNotifs, ...jrNotifs].sort(
             (a, b) =>
               new Date(b.data.created_at).getTime() -
               new Date(a.data.created_at).getTime()
@@ -205,6 +229,65 @@ export function NotificationBell() {
                           </span>
                         </div>
                         <MessageCircle
+                          size={14}
+                          className="mt-1 shrink-0 text-[#0066CC]"
+                        />
+                      </div>
+                    </Link>
+                  );
+                }
+
+                if (notif.type === "join_request") {
+                  const jr = notif.data as JoinRequestItem;
+                  return (
+                    <Link
+                      key={`jr-${jr.id}`}
+                      href="/trips"
+                      onClick={() => setOpen(false)}
+                      className="block border-b border-[#F1F3F5] px-4 py-3 transition-colors hover:bg-[#F8F9FA] last:border-0"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
+                          {jr.requester.profile_pic_url ? (
+                            <img
+                              src={jr.requester.profile_pic_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-[10px] font-bold text-white">
+                              {jr.requester.name?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-[#1A1A1A]">
+                            <span className="font-semibold">
+                              {jr.requester.name}
+                            </span>{" "}
+                            wants to join your trip
+                          </p>
+                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#666666]">
+                            <MapPin
+                              size={10}
+                              className="shrink-0 text-[#0066CC]"
+                            />
+                            <span className="truncate">
+                              {jr.trip.start_station}
+                            </span>
+                            <ArrowRight
+                              size={8}
+                              className="shrink-0 text-[#999999]"
+                            />
+                            <span className="truncate">
+                              {jr.trip.end_station}
+                            </span>
+                          </div>
+                          <span className="mt-0.5 text-[10px] text-[#999999]">
+                            {timeAgo(jr.created_at)}
+                          </span>
+                        </div>
+                        <Train
                           size={14}
                           className="mt-1 shrink-0 text-[#0066CC]"
                         />

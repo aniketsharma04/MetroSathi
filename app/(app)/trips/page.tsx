@@ -11,6 +11,11 @@ import {
   Trash2,
   Loader2,
   ArrowRight,
+  Users,
+  ChevronDown,
+  Check,
+  X,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +27,7 @@ import {
 import { TripForm } from "@/components/trip-form";
 import { toast } from "sonner";
 import Link from "next/link";
-import type { Trip } from "@/lib/types";
+import type { Trip, TripJoinRequestWithUser } from "@/lib/types";
 
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -67,6 +72,14 @@ export default function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Join requests state
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [joinRequests, setJoinRequests] = useState<
+    Record<string, TripJoinRequestWithUser[]>
+  >({});
+  const [loadingRequests, setLoadingRequests] = useState<string | null>(null);
+  const [actionRequestId, setActionRequestId] = useState<string | null>(null);
 
   const fetchTrips = useCallback(async () => {
     const res = await fetch("/api/trips");
@@ -117,6 +130,70 @@ export default function TripsPage() {
     toast.success("Trip updated");
     setEditingTrip(null);
     fetchTrips();
+  };
+
+  const toggleJoinRequests = async (tripId: string) => {
+    if (expandedTripId === tripId) {
+      setExpandedTripId(null);
+      return;
+    }
+
+    setExpandedTripId(tripId);
+
+    // Fetch join requests if not already loaded
+    if (!joinRequests[tripId]) {
+      setLoadingRequests(tripId);
+      const res = await fetch(`/api/join-requests?trip_id=${tripId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setJoinRequests((prev) => ({ ...prev, [tripId]: data }));
+      } else {
+        toast.error("Failed to load join requests");
+      }
+      setLoadingRequests(null);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId: string, tripId: string) => {
+    setActionRequestId(requestId);
+    const res = await fetch(`/api/join-requests/${requestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "accepted" }),
+    });
+
+    if (!res.ok) {
+      toast.error("Failed to accept request");
+    } else {
+      toast.success("Request accepted!");
+      setJoinRequests((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).map((r) =>
+          r.id === requestId ? { ...r, status: "accepted" } : r
+        ),
+      }));
+    }
+    setActionRequestId(null);
+  };
+
+  const handleRejectRequest = async (requestId: string, tripId: string) => {
+    setActionRequestId(requestId);
+    const res = await fetch(`/api/join-requests/${requestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "rejected" }),
+    });
+
+    if (!res.ok) {
+      toast.error("Failed to reject request");
+    } else {
+      toast.info("Request rejected");
+      setJoinRequests((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).filter((r) => r.id !== requestId),
+      }));
+    }
+    setActionRequestId(null);
   };
 
   if (loading) {
@@ -173,74 +250,219 @@ export default function TripsPage() {
                 {dateLabel}
               </h2>
               <div className="space-y-3">
-                {grouped[dateLabel].map((trip) => (
-                  <div
-                    key={trip.id}
-                    className="rounded-xl border border-[#E0E0E0] bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        {/* Route */}
-                        <div className="flex items-center gap-2 text-sm font-medium text-[#1A1A1A]">
-                          <MapPin
-                            size={14}
-                            className="shrink-0 text-[#0066CC]"
-                          />
-                          <span className="truncate">
-                            {trip.start_station}
-                          </span>
-                          <ArrowRight
-                            size={14}
-                            className="shrink-0 text-[#999999]"
-                          />
-                          <span className="truncate">{trip.end_station}</span>
+                {grouped[dateLabel].map((trip) => {
+                  const isExpanded = expandedTripId === trip.id;
+                  const requests = joinRequests[trip.id] ?? [];
+                  const isLoadingReqs = loadingRequests === trip.id;
+
+                  return (
+                    <div
+                      key={trip.id}
+                      className="rounded-xl border border-[#E0E0E0] bg-white shadow-sm"
+                    >
+                      <div className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            {/* Route */}
+                            <div className="flex items-center gap-2 text-sm font-medium text-[#1A1A1A]">
+                              <MapPin
+                                size={14}
+                                className="shrink-0 text-[#0066CC]"
+                              />
+                              <span className="truncate">
+                                {trip.start_station}
+                              </span>
+                              <ArrowRight
+                                size={14}
+                                className="shrink-0 text-[#999999]"
+                              />
+                              <span className="truncate">
+                                {trip.end_station}
+                              </span>
+                            </div>
+
+                            {/* Time */}
+                            <div className="flex items-center gap-4 text-xs text-[#666666]">
+                              <span className="flex items-center gap-1">
+                                <Clock size={12} />
+                                {formatTime(trip.travel_time)}
+                              </span>
+                              {trip.is_repeating &&
+                                trip.repeat_days.length > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <Repeat size={12} />
+                                    {trip.repeat_days
+                                      .sort((a, b) => a - b)
+                                      .map((d) => WEEKDAY_NAMES[d])
+                                      .join(", ")}
+                                  </span>
+                                )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="ml-2 flex shrink-0 gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-[#666666] hover:text-[#0066CC]"
+                              onClick={() => setEditingTrip(trip)}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-[#666666] hover:text-[#EF4444]"
+                              onClick={() => handleDelete(trip.id)}
+                              disabled={deletingId === trip.id}
+                            >
+                              {deletingId === trip.id ? (
+                                <Loader2
+                                  size={14}
+                                  className="animate-spin"
+                                />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                            </Button>
+                          </div>
                         </div>
 
-                        {/* Time */}
-                        <div className="flex items-center gap-4 text-xs text-[#666666]">
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />
-                            {formatTime(trip.travel_time)}
-                          </span>
-                          {trip.is_repeating && trip.repeat_days.length > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Repeat size={12} />
-                              {trip.repeat_days
-                                .sort((a, b) => a - b)
-                                .map((d) => WEEKDAY_NAMES[d])
-                                .join(", ")}
-                            </span>
-                          )}
-                        </div>
+                        {/* Join Requests Toggle */}
+                        <button
+                          onClick={() => toggleJoinRequests(trip.id)}
+                          className="mt-3 flex w-full items-center gap-1.5 rounded-lg border border-[#E0E0E0] px-3 py-1.5 text-xs text-[#666666] transition-colors hover:bg-[#F8F9FA]"
+                        >
+                          <Users size={12} />
+                          Join Requests
+                          <ChevronDown
+                            size={12}
+                            className={`ml-auto transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          />
+                        </button>
                       </div>
 
-                      {/* Actions */}
-                      <div className="ml-2 flex shrink-0 gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-[#666666] hover:text-[#0066CC]"
-                          onClick={() => setEditingTrip(trip)}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-[#666666] hover:text-[#EF4444]"
-                          onClick={() => handleDelete(trip.id)}
-                          disabled={deletingId === trip.id}
-                        >
-                          {deletingId === trip.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={14} />
+                      {/* Expanded Join Requests */}
+                      {isExpanded && (
+                        <div className="border-t border-[#E0E0E0] px-4 py-3">
+                          {isLoadingReqs && (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2
+                                size={18}
+                                className="animate-spin text-[#0066CC]"
+                              />
+                            </div>
                           )}
-                        </Button>
-                      </div>
+
+                          {!isLoadingReqs && requests.length === 0 && (
+                            <p className="py-2 text-center text-xs text-[#999999]">
+                              No pending join requests
+                            </p>
+                          )}
+
+                          {!isLoadingReqs &&
+                            requests.map((req) => {
+                              const initials = req.requester.name
+                                ? req.requester.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .toUpperCase()
+                                    .slice(0, 2)
+                                : "?";
+
+                              return (
+                                <div
+                                  key={req.id}
+                                  className="flex items-center gap-3 py-2"
+                                >
+                                  {/* Avatar */}
+                                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
+                                    {req.requester.profile_pic_url ? (
+                                      <img
+                                        src={req.requester.profile_pic_url}
+                                        alt={req.requester.name}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-[10px] font-bold text-white">
+                                        {initials}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Name */}
+                                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#1A1A1A]">
+                                    {req.requester.name}
+                                  </span>
+
+                                  {/* Actions */}
+                                  {req.status === "pending" ? (
+                                    <div className="flex shrink-0 gap-1.5">
+                                      <Button
+                                        size="sm"
+                                        className="h-7 gap-1 bg-[#0066CC] px-2 text-[11px] hover:bg-[#0052A3]"
+                                        onClick={() =>
+                                          handleAcceptRequest(
+                                            req.id,
+                                            trip.id
+                                          )
+                                        }
+                                        disabled={
+                                          actionRequestId === req.id
+                                        }
+                                      >
+                                        {actionRequestId === req.id ? (
+                                          <Loader2
+                                            size={12}
+                                            className="animate-spin"
+                                          />
+                                        ) : (
+                                          <Check size={12} />
+                                        )}
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 gap-1 px-2 text-[11px]"
+                                        onClick={() =>
+                                          handleRejectRequest(
+                                            req.id,
+                                            trip.id
+                                          )
+                                        }
+                                        disabled={
+                                          actionRequestId === req.id
+                                        }
+                                      >
+                                        <X size={12} />
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="h-7 gap-1 bg-[#0066CC] px-2 text-[11px] hover:bg-[#0052A3]"
+                                      onClick={() =>
+                                        router.push(
+                                          `/connections?chat=${req.requester_id}`
+                                        )
+                                      }
+                                    >
+                                      <MessageCircle size={12} />
+                                      Chat
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

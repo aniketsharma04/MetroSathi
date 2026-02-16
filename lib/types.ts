@@ -79,6 +79,21 @@ export interface Report {
   created_at: string;
 }
 
+export type JoinRequestStatus = "pending" | "accepted" | "rejected";
+
+export interface TripJoinRequest {
+  id: string;
+  trip_id: string;
+  requester_id: string;
+  status: JoinRequestStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripJoinRequestWithUser extends TripJoinRequest {
+  requester: UserProfile;
+}
+
 export interface SearchFilters {
   start_station: string;
   end_station: string;
