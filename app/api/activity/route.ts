@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// GET /api/activity - Fetch recent trips from user's connections (last 7 days)
+// GET /api/activity - Fetch recent trips + messages from user's connections
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -12,10 +12,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Get all accepted connection user IDs
+  // Get all accepted connections with IDs
   const { data: connections, error: connError } = await supabase
     .from("connections")
-    .select("requester_id, recipient_id")
+    .select("id, requester_id, recipient_id")
     .eq("status", "accepted")
     .or(`requester_id.eq.${user.id},recipient_id.eq.${user.id}`);
 
@@ -28,31 +28,93 @@ export async function GET() {
   );
 
   if (friendIds.length === 0) {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ items: [], messages: [] });
   }
 
-  // Fetch trips created in last 7 days by connected users
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const { data: trips, error: tripsError } = await supabase
-    .from("trips")
-    .select(
-      `
-      *,
-      user:profiles!trips_user_id_fkey (
-        id, name, profile_pic_url
-      )
-    `
-    )
-    .in("user_id", friendIds)
-    .gte("created_at", sevenDaysAgo.toISOString())
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const connectionIds = (connections ?? []).map((c) => c.id);
 
-  if (tripsError) {
-    return NextResponse.json({ error: tripsError.message }, { status: 500 });
+  // Fetch trips and recent messages in parallel
+  const [tripsResult, messagesResult] = await Promise.all([
+    // Trips created in last 7 days by connected users
+    supabase
+      .from("trips")
+      .select(
+        `
+        *,
+        user:profiles!trips_user_id_fkey (
+          id, name, profile_pic_url
+        )
+      `
+      )
+      .in("user_id", friendIds)
+      .gte("created_at", sevenDaysAgo.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(20),
+
+    // Recent messages from connections (not sent by current user)
+    connectionIds.length > 0
+      ? supabase
+          .from("messages")
+          .select(
+            `
+            id, connection_id, sender_id, content, created_at
+          `
+          )
+          .in("connection_id", connectionIds)
+          .neq("sender_id", user.id)
+          .gte("created_at", sevenDaysAgo.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (tripsResult.error) {
+    return NextResponse.json({ error: tripsResult.error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ items: trips ?? [] });
+  // Build a map of friend profiles for messages
+  const friendProfileMap: Record<string, { id: string; name: string; profile_pic_url: string | null }> = {};
+  for (const trip of tripsResult.data ?? []) {
+    if (trip.user) {
+      friendProfileMap[trip.user.id] = trip.user;
+    }
+  }
+
+  // If we have messages from users not in trips, fetch their profiles
+  const messagesSenderIds = [
+    ...new Set((messagesResult.data ?? []).map((m) => m.sender_id)),
+  ].filter((id) => !friendProfileMap[id]);
+
+  if (messagesSenderIds.length > 0) {
+    const { data: extraProfiles } = await supabase
+      .from("profiles")
+      .select("id, name, profile_pic_url")
+      .in("id", messagesSenderIds);
+
+    for (const p of extraProfiles ?? []) {
+      friendProfileMap[p.id] = p;
+    }
+  }
+
+  // Deduplicate messages: only show the latest message per sender
+  type MessageRow = { id: string; connection_id: string; sender_id: string; content: string; created_at: string };
+  const latestPerSender: Record<string, MessageRow> = {};
+  for (const msg of (messagesResult.data ?? []) as MessageRow[]) {
+    if (!latestPerSender[msg.sender_id] || new Date(msg.created_at) > new Date(latestPerSender[msg.sender_id].created_at)) {
+      latestPerSender[msg.sender_id] = msg;
+    }
+  }
+
+  const messageItems = Object.values(latestPerSender).map((msg) => ({
+    ...msg,
+    user: friendProfileMap[msg.sender_id] ?? { id: msg.sender_id, name: "Unknown", profile_pic_url: null },
+  }));
+
+  return NextResponse.json({
+    items: tripsResult.data ?? [],
+    messages: messageItems,
+  });
 }

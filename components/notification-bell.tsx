@@ -18,6 +18,22 @@ interface ActivityItem {
   };
 }
 
+interface MessageItem {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  user: {
+    id: string;
+    name: string;
+    profile_pic_url: string | null;
+  };
+}
+
+type NotificationItem =
+  | { type: "trip"; data: ActivityItem }
+  | { type: "message"; data: MessageItem };
+
 function formatDate(dateStr: string) {
   const date = new Date(dateStr + "T00:00:00");
   const today = new Date();
@@ -42,22 +58,63 @@ function timeAgo(timestamp: string): string {
 }
 
 export function NotificationBell() {
-  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/activity")
-      .then((res) => (res.ok ? res.json() : { items: [] }))
-      .then((data) => setItems(data.items ?? []))
-      .catch(() => setItems([]));
+      .then((res) => (res.ok ? res.json() : { items: [], messages: [] }))
+      .then((data) => {
+        const tripNotifs: NotificationItem[] = (data.items ?? []).map(
+          (item: ActivityItem) => ({ type: "trip" as const, data: item })
+        );
+        const msgNotifs: NotificationItem[] = (data.messages ?? []).map(
+          (item: MessageItem) => ({ type: "message" as const, data: item })
+        );
+        // Merge and sort by created_at descending
+        const all = [...tripNotifs, ...msgNotifs].sort(
+          (a, b) =>
+            new Date(b.data.created_at).getTime() -
+            new Date(a.data.created_at).getTime()
+        );
+        setNotifications(all);
+      })
+      .catch(() => setNotifications([]));
+  }, []);
+
+  // Poll for new notifications every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/activity")
+        .then((res) => (res.ok ? res.json() : { items: [], messages: [] }))
+        .then((data) => {
+          const tripNotifs: NotificationItem[] = (data.items ?? []).map(
+            (item: ActivityItem) => ({ type: "trip" as const, data: item })
+          );
+          const msgNotifs: NotificationItem[] = (data.messages ?? []).map(
+            (item: MessageItem) => ({ type: "message" as const, data: item })
+          );
+          const all = [...tripNotifs, ...msgNotifs].sort(
+            (a, b) =>
+              new Date(b.data.created_at).getTime() -
+              new Date(a.data.created_at).getTime()
+          );
+          setNotifications(all);
+        })
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -65,12 +122,12 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const unreadCount = Math.max(0, items.length - seen);
+  const unreadCount = Math.max(0, notifications.length - seen);
 
   const handleOpen = () => {
     setOpen(!open);
     if (!open) {
-      setSeen(items.length);
+      setSeen(notifications.length);
     }
   };
 
@@ -92,7 +149,9 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-11 z-[70] w-80 rounded-xl border border-[#E0E0E0] bg-white shadow-lg">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <h3 className="text-sm font-semibold text-[#1A1A1A]">Activity</h3>
+            <h3 className="text-sm font-semibold text-[#1A1A1A]">
+              Notifications
+            </h3>
             <button
               onClick={() => setOpen(false)}
               className="text-[#999999] hover:text-[#666666]"
@@ -102,63 +161,124 @@ export function NotificationBell() {
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            {items.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="py-8 text-center text-sm text-[#999999]">
                 No recent activity
               </div>
             ) : (
-              items.map((item) => (
-                <div
-                  key={item.id}
-                  className="border-b border-[#F1F3F5] px-4 py-3 last:border-0"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
-                      {item.user.profile_pic_url ? (
-                        <img
-                          src={item.user.profile_pic_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-[10px] font-bold text-white">
-                          {item.user.name?.[0]?.toUpperCase() ?? "?"}
+              notifications.map((notif) => {
+                if (notif.type === "message") {
+                  const msg = notif.data;
+                  return (
+                    <Link
+                      key={`msg-${msg.id}`}
+                      href={`/connections?chat=${msg.user.id}`}
+                      onClick={() => setOpen(false)}
+                      className="block border-b border-[#F1F3F5] px-4 py-3 transition-colors hover:bg-[#F8F9FA] last:border-0"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
+                          {msg.user.profile_pic_url ? (
+                            <img
+                              src={msg.user.profile_pic_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-[10px] font-bold text-white">
+                              {msg.user.name?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-[#1A1A1A]">
-                        <span className="font-semibold">{item.user.name}</span>{" "}
-                        added a trip
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#666666]">
-                        <MapPin size={10} className="shrink-0 text-[#0066CC]" />
-                        <span className="truncate">{item.start_station}</span>
-                        <ArrowRight size={8} className="shrink-0 text-[#999999]" />
-                        <span className="truncate">{item.end_station}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-[#1A1A1A]">
+                            <span className="font-semibold">
+                              {msg.user.name}
+                            </span>{" "}
+                            messaged you
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] text-[#666666]">
+                            {msg.content}
+                          </p>
+                          <span className="mt-0.5 text-[10px] text-[#999999]">
+                            {timeAgo(msg.created_at)}
+                          </span>
+                        </div>
+                        <MessageCircle
+                          size={14}
+                          className="mt-1 shrink-0 text-[#0066CC]"
+                        />
                       </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-[10px] text-[#999999]">
-                          {formatDate(item.travel_date)} &middot; {timeAgo(item.created_at)}
-                        </span>
-                        <Link
-                          href={`/connections?chat=${item.user.id}`}
-                          onClick={() => setOpen(false)}
-                        >
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 gap-1 px-2 text-[10px] text-[#0066CC] hover:bg-[#E6F2FF]"
+                    </Link>
+                  );
+                }
+
+                // Trip notification
+                const item = notif.data as ActivityItem;
+                return (
+                  <div
+                    key={`trip-${item.id}`}
+                    className="border-b border-[#F1F3F5] px-4 py-3 last:border-0"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-[#E0E0E0]">
+                        {item.user.profile_pic_url ? (
+                          <img
+                            src={item.user.profile_pic_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-[10px] font-bold text-white">
+                            {item.user.name?.[0]?.toUpperCase() ?? "?"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-[#1A1A1A]">
+                          <span className="font-semibold">
+                            {item.user.name}
+                          </span>{" "}
+                          added a trip
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#666666]">
+                          <MapPin
+                            size={10}
+                            className="shrink-0 text-[#0066CC]"
+                          />
+                          <span className="truncate">
+                            {item.start_station}
+                          </span>
+                          <ArrowRight
+                            size={8}
+                            className="shrink-0 text-[#999999]"
+                          />
+                          <span className="truncate">{item.end_station}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-[10px] text-[#999999]">
+                            {formatDate(item.travel_date)} &middot;{" "}
+                            {timeAgo(item.created_at)}
+                          </span>
+                          <Link
+                            href={`/connections?chat=${item.user.id}`}
+                            onClick={() => setOpen(false)}
                           >
-                            <MessageCircle size={10} />
-                            Message
-                          </Button>
-                        </Link>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 gap-1 px-2 text-[10px] text-[#0066CC] hover:bg-[#E6F2FF]"
+                            >
+                              <MessageCircle size={10} />
+                              Message
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

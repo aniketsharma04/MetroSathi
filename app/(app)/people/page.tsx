@@ -21,6 +21,7 @@ import type { Trip } from "@/lib/types";
 interface PersonResult {
   id: string;
   name: string;
+  user_id: string | null;
   age: number;
   gender: string;
   profile_pic_url: string | null;
@@ -162,7 +163,7 @@ export default function PeoplePage() {
           Find People
         </h1>
         <p className="mt-1 text-sm text-[#666666]">
-          Search by name to connect and see their trips
+          Search by name or user ID to connect and see their trips
         </p>
       </div>
 
@@ -175,7 +176,7 @@ export default function PeoplePage() {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name..."
+          placeholder="Search by name or user ID..."
           className="bg-white pl-10"
         />
       </div>
@@ -219,6 +220,9 @@ export default function PeoplePage() {
                   <h3 className="text-sm font-semibold text-[#1A1A1A] truncate">
                     {person.name}
                   </h3>
+                  {person.user_id && (
+                    <p className="text-[11px] text-[#0066CC] truncate">@{person.user_id}</p>
+                  )}
                   <div className="flex items-center gap-2 text-xs text-[#666666]">
                     {person.age && <span>{person.age}y</span>}
                     {person.gender && (

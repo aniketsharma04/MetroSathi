@@ -11,6 +11,7 @@ import {
   Phone,
   Save,
   X,
+  AtSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,7 @@ export default function ProfilePage() {
     profile?.instagram_handle ?? ""
   );
   const [twitter, setTwitter] = useState(profile?.twitter_handle ?? "");
+  const [userId, setUserId] = useState(profile?.user_id ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [phoneVisible, setPhoneVisible] = useState(
     profile?.phone_visible ?? false
@@ -60,6 +62,7 @@ export default function ProfilePage() {
 
   const startEditing = () => {
     setName(profile?.name ?? "");
+    setUserId(profile?.user_id ?? "");
     setAge(profile?.age?.toString() ?? "");
     setGender((profile?.gender as Gender) ?? "");
     setBio(profile?.bio ?? "");
@@ -140,6 +143,7 @@ export default function ProfilePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.trim(),
+        user_id: userId.trim().toLowerCase() || null,
         age: ageNum,
         gender,
         bio: bio.trim() || null,
@@ -218,6 +222,9 @@ export default function ProfilePage() {
           <h1 className="text-xl font-semibold text-[#1A1A1A]">
             {profile.name}
           </h1>
+          {profile.user_id && (
+            <p className="text-sm text-[#0066CC]">@{profile.user_id}</p>
+          )}
           <div className="mt-1 flex items-center gap-2 text-sm text-[#666666]">
             {profile.age && <span>{profile.age} years old</span>}
             {profile.gender && (
@@ -361,6 +368,25 @@ export default function ProfilePage() {
               onChange={(e) => setName(e.target.value)}
               className="bg-[#F1F3F5]"
             />
+          </div>
+
+          {/* User ID */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-user-id" className="flex items-center gap-1.5">
+              <AtSign size={14} />
+              User ID
+            </Label>
+            <Input
+              id="edit-user-id"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              placeholder="your_unique_id"
+              className="bg-[#F1F3F5]"
+              maxLength={30}
+            />
+            <p className="text-xs text-[#999999]">
+              Unique ID so others can find you. Only lowercase letters, numbers, and underscores.
+            </p>
           </div>
 
           {/* Age */}

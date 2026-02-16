@@ -42,7 +42,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { name, age, gender, bio, instagram_handle, twitter_handle, phone, phone_visible, profile_pic_url } = body;
+  const { name, age, gender, bio, instagram_handle, twitter_handle, phone, phone_visible, profile_pic_url, user_id } = body;
 
   // Validation
   if (name !== undefined) {
@@ -73,8 +73,44 @@ export async function PATCH(request: Request) {
     }
   }
 
+  if (user_id !== undefined && user_id !== null) {
+    const cleanId = user_id.trim().toLowerCase();
+    if (cleanId.length < 3) {
+      return NextResponse.json(
+        { error: "User ID must be at least 3 characters" },
+        { status: 400 }
+      );
+    }
+    if (cleanId.length > 30) {
+      return NextResponse.json(
+        { error: "User ID must be at most 30 characters" },
+        { status: 400 }
+      );
+    }
+    if (!/^[a-z0-9_]+$/.test(cleanId)) {
+      return NextResponse.json(
+        { error: "User ID can only contain lowercase letters, numbers, and underscores" },
+        { status: 400 }
+      );
+    }
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", cleanId)
+      .neq("id", user.id)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json(
+        { error: "This User ID is already taken" },
+        { status: 409 }
+      );
+    }
+  }
+
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name.trim();
+  if (user_id !== undefined) updateData.user_id = user_id?.trim().toLowerCase() || null;
   if (age !== undefined) updateData.age = Number(age);
   if (gender !== undefined) updateData.gender = gender;
   if (bio !== undefined) updateData.bio = bio?.trim() || null;

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { NotificationBell } from "@/components/notification-bell";
 import Link from "next/link";
 
 interface ActivityItem {
@@ -135,13 +136,16 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-semibold text-[#1A1A1A] md:text-3xl">
-          Hey, {firstName}!
-        </h1>
-        <p className="mt-1 text-sm text-[#666666]">
-          Find your travel companion today
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#1A1A1A] md:text-3xl">
+            Hey, {firstName}!
+          </h1>
+          <p className="mt-1 text-sm text-[#666666]">
+            Find your travel companion today
+          </p>
+        </div>
+        <NotificationBell />
       </div>
 
       {/* Quick Stats */}

@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Search query must be at least 2 characters" }, { status: 400 });
   }
 
-  // Search profiles by name (case-insensitive), exclude current user
+  // Search profiles by name or user_id (case-insensitive), exclude current user
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("id, name, age, gender, profile_pic_url, bio")
+    .select("id, name, user_id, age, gender, profile_pic_url, bio")
     .neq("id", user.id)
-    .ilike("name", `%${q}%`)
+    .or(`name.ilike.%${q}%,user_id.ilike.%${q}%`)
     .limit(20);
 
   if (error) {

@@ -11,6 +11,7 @@ create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text not null,
   name text not null,
+  user_id text unique,
   age integer check (age >= 18 and age <= 100),
   gender text check (gender in ('Male', 'Female', 'Other')),
   profile_pic_url text,
@@ -186,12 +187,30 @@ create policy "Users can view own reports"
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  base_name text;
+  generated_id text;
+  suffix int;
 begin
-  insert into public.profiles (id, email, name)
+  base_name := lower(regexp_replace(
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    '[^a-zA-Z0-9]', '', 'g'
+  ));
+  generated_id := base_name;
+  suffix := 0;
+
+  -- Ensure uniqueness by appending a number if needed
+  while exists (select 1 from public.profiles where profiles.user_id = generated_id) loop
+    suffix := suffix + 1;
+    generated_id := base_name || suffix::text;
+  end loop;
+
+  insert into public.profiles (id, email, name, user_id)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    generated_id
   );
   return new;
 end;

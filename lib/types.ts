@@ -18,6 +18,7 @@ export interface UserProfile {
   id: string;
   email: string;
   name: string;
+  user_id: string | null;
   age: number;
   gender: Gender;
   profile_pic_url: string | null;
