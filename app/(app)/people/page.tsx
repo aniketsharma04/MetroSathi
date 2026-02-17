@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,8 +179,16 @@ export default function PeoplePage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name or user ID..."
-          className="bg-white pl-10"
+          className="bg-white pl-10 pr-10"
         />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 hover:bg-[#F3F4F6] text-[#999999] hover:text-[#666666]"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Loading */}
@@ -233,10 +242,10 @@ export default function PeoplePage() {
                     {person.gender && (
                       <span
                         className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${person.gender === "Male"
-                            ? "bg-[#DBEAFE] text-[#3B82F6]"
-                            : person.gender === "Female"
-                              ? "bg-[#FCE7F3] text-[#EC4899]"
-                              : "bg-[#EDE9FE] text-[#8B5CF6]"
+                          ? "bg-[#DBEAFE] text-[#3B82F6]"
+                          : person.gender === "Female"
+                            ? "bg-[#FCE7F3] text-[#EC4899]"
+                            : "bg-[#EDE9FE] text-[#8B5CF6]"
                           }`}
                       >
                         {person.gender}
