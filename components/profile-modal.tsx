@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ReportModal } from "@/components/report-modal";
+import { ImageViewer } from "@/components/image-viewer";
 import type { UserProfile, Trip } from "@/lib/types";
 
 function formatTime(time: string) {
@@ -158,19 +159,23 @@ export function ProfileModal({
 
           <div className="flex flex-col items-center space-y-4 pt-2">
             {/* Avatar */}
-            <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0]">
-              {user.profile_pic_url ? (
-                <img
-                  src={user.profile_pic_url}
-                  alt={user.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
+            {user.profile_pic_url ? (
+              <ImageViewer src={user.profile_pic_url} alt={`${user.name}'s profile picture`}>
+                <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0] ring-2 ring-transparent transition-all hover:ring-[#0066CC]">
+                  <img
+                    src={user.profile_pic_url}
+                    alt={user.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </ImageViewer>
+            ) : (
+              <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0]">
                 <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-2xl font-bold text-white">
                   {initials}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Name + Age + Gender */}
             <div className="text-center">
