@@ -12,7 +12,11 @@ import {
   Loader2,
   Flag,
   TrainFront,
+  UserRoundPlus,
+  Check,
+  XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -68,29 +72,64 @@ export function ProfileModal({
   const [reportOpen, setReportOpen] = useState(false);
   const [userTrips, setUserTrips] = useState<Trip[]>([]);
   const [tripsLoading, setTripsLoading] = useState(false);
+  const [joinStatuses, setJoinStatuses] = useState<Record<string, string>>({});
+  const [joiningTripId, setJoiningTripId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && user && connectionStatus === "connected") {
       setTripsLoading(true);
       fetch(`/api/people/${user.id}/trips`)
         .then((res) => (res.ok ? res.json() : []))
-        .then((data) => setUserTrips(data))
+        .then((data: Trip[]) => {
+          setUserTrips(data);
+          // Fetch existing join request statuses for these trips
+          if (data.length > 0) {
+            const tripIds = data.map((t) => t.id).join(",");
+            fetch(`/api/join-requests/mine?trip_ids=${tripIds}`)
+              .then((res) => (res.ok ? res.json() : {}))
+              .then((statuses) => setJoinStatuses(statuses))
+              .catch(() => setJoinStatuses({}));
+          }
+        })
         .catch(() => setUserTrips([]))
         .finally(() => setTripsLoading(false));
     } else {
       setUserTrips([]);
+      setJoinStatuses({});
     }
   }, [open, user?.id, connectionStatus]);
+
+  const handleJoinTrip = async (tripId: string) => {
+    setJoiningTripId(tripId);
+    const res = await fetch("/api/join-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trip_id: tripId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      if (res.status === 409) {
+        toast.error("You have already requested to join this trip");
+      } else {
+        toast.error(data.error || "Failed to send join request");
+      }
+    } else {
+      toast.success("Join request sent!");
+      setJoinStatuses((prev) => ({ ...prev, [tripId]: "pending" }));
+    }
+    setJoiningTripId(null);
+  };
 
   if (!user) return null;
 
   const initials = user.name
     ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
     : "?";
 
   const genderBadgeClass =
@@ -204,30 +243,73 @@ export function ProfileModal({
                   </div>
                 ) : userTrips.length > 0 ? (
                   <div className="space-y-1.5">
-                    {userTrips.slice(0, 5).map((trip) => (
-                      <div
-                        key={trip.id}
-                        className="rounded-lg bg-[#F8F9FA] px-3 py-2"
-                      >
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#1A1A1A]">
-                          <MapPin size={12} className="shrink-0 text-[#0066CC]" />
-                          <span className="truncate">{trip.start_station}</span>
-                          <ArrowRight size={10} className="shrink-0 text-[#999999]" />
-                          <span className="truncate">{trip.end_station}</span>
+                    {userTrips.slice(0, 5).map((trip) => {
+                      const status = joinStatuses[trip.id];
+                      const isJoining = joiningTripId === trip.id;
+
+                      return (
+                        <div
+                          key={trip.id}
+                          className="rounded-lg bg-[#F8F9FA] px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-[#1A1A1A]">
+                                <MapPin size={12} className="shrink-0 text-[#0066CC]" />
+                                <span className="truncate">{trip.start_station}</span>
+                                <ArrowRight size={10} className="shrink-0 text-[#999999]" />
+                                <span className="truncate">{trip.end_station}</span>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2 text-[11px] text-[#666666]">
+                                <span className="flex items-center gap-0.5">
+                                  <Clock size={10} />
+                                  {formatTime(trip.travel_time)}
+                                </span>
+                                <span>
+                                  {trip.is_repeating
+                                    ? `Repeats: ${trip.repeat_days?.sort((a: number, b: number) => a - b).map((d: number) => WEEKDAY_NAMES[d]).join(", ")}`
+                                    : new Date(trip.travel_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Join Trip Button */}
+                            {!status && (
+                              <Button
+                                size="sm"
+                                className="h-7 shrink-0 gap-1 rounded-full bg-[#16A34A] px-3 text-[11px] hover:bg-[#15803D]"
+                                onClick={() => handleJoinTrip(trip.id)}
+                                disabled={isJoining}
+                              >
+                                {isJoining ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <UserRoundPlus size={12} />
+                                )}
+                                Join
+                              </Button>
+                            )}
+                            {status === "pending" && (
+                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#FEF3C7] px-2.5 py-1 text-[11px] font-medium text-[#D97706]">
+                                <Clock size={10} />
+                                Pending
+                              </span>
+                            )}
+                            {status === "accepted" && (
+                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#DCFCE7] px-2.5 py-1 text-[11px] font-medium text-[#16A34A]">
+                                <Check size={10} />
+                                Joined
+                              </span>
+                            )}
+                            {status === "rejected" && (
+                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#FEE2E2] px-2.5 py-1 text-[11px] font-medium text-[#EF4444]">
+                                <XCircle size={10} />
+                                Declined
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-[11px] text-[#666666]">
-                          <span className="flex items-center gap-0.5">
-                            <Clock size={10} />
-                            {formatTime(trip.travel_time)}
-                          </span>
-                          <span>
-                            {trip.is_repeating
-                              ? `Repeats: ${trip.repeat_days?.sort((a: number, b: number) => a - b).map((d: number) => WEEKDAY_NAMES[d]).join(", ")}`
-                              : new Date(trip.travel_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="py-2 text-center text-xs text-[#999999]">
