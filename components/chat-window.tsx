@@ -35,10 +35,44 @@ export function ChatWindow({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use setTimeout to ensure DOM has updated before scrolling
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   }, []);
+
+  // Track visual viewport height for mobile keyboard handling
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleResize = () => {
+      // Set CSS variable to the actual visible height
+      container.style.setProperty(
+        "--visual-viewport-height",
+        `${viewport.height}px`
+      );
+      // Scroll to bottom when keyboard opens (viewport shrinks)
+      scrollToBottom();
+    };
+
+    // Set initial value
+    handleResize();
+
+    viewport.addEventListener("resize", handleResize);
+    viewport.addEventListener("scroll", handleResize);
+
+    return () => {
+      viewport.removeEventListener("resize", handleResize);
+      viewport.removeEventListener("scroll", handleResize);
+    };
+  }, [scrollToBottom]);
 
   // Fetch messages
   const fetchMessages = useCallback(async () => {
@@ -165,9 +199,9 @@ export function ChatWindow({
   const groupedMessages = groupByDate(messages);
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-white px-4 py-3">
+    <div ref={containerRef} className="flex h-full flex-col">
+      {/* Header - sticky so it stays visible when keyboard opens */}
+      <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b bg-white px-4 py-3">
         <button
           onClick={onBack}
           className="shrink-0 rounded-lg p-1 text-[#666666] hover:bg-[#F1F3F5] md:hidden"
@@ -325,8 +359,8 @@ export function ChatWindow({
         <div ref={messagesEndRef} />
       </div>}
 
-      {/* Input */}
-      {isConnected && <div className="border-t bg-white px-4 py-3 pb-safe">
+      {/* Input - shrink-0 ensures it stays visible */}
+      {isConnected && <div className="shrink-0 border-t bg-white px-4 py-3 pb-safe">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}

@@ -149,9 +149,9 @@ function ConnectionsPageContent() {
   // Find the active chat connection and user
   const activeChatConnection = activeChatUserId
     ? accepted.find((c) => {
-        const other = getOtherUser(c);
-        return other.id === activeChatUserId;
-      })
+      const other = getOtherUser(c);
+      return other.id === activeChatUserId;
+    })
     : null;
   const activeChatUser = activeChatConnection
     ? getOtherUser(activeChatConnection)
@@ -180,7 +180,7 @@ function ConnectionsPageContent() {
       .then((profile) => {
         if (profile) setUnconnectedUser(profile);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [activeChatUserId, activeChatConnection, loading, pending, sent]);
 
   const handleSendConnectionRequest = async () => {
@@ -269,7 +269,7 @@ function ConnectionsPageContent() {
       {/* Mobile: Full view or Chat overlay */}
       <div className="md:hidden">
         {activeChatUser && activeChatConnection ? (
-          <div className="fixed inset-0 z-[60] flex flex-col bg-[#F8F9FA]" style={{ height: "100dvh" }}>
+          <div className="chat-fullscreen">
             <ChatWindow
               connectionId={activeChatConnection.id}
               otherUser={activeChatUser}
@@ -277,7 +277,7 @@ function ConnectionsPageContent() {
             />
           </div>
         ) : !activeChatUser && unconnectedUser ? (
-          <div className="fixed inset-0 z-[60] flex flex-col bg-[#F8F9FA]" style={{ height: "100dvh" }}>
+          <div className="chat-fullscreen">
             <ChatWindow
               connectionId=""
               otherUser={unconnectedUser}
@@ -623,11 +623,11 @@ function ConnectionCard({
 }) {
   const initials = profile.name
     ? profile.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
     : "?";
 
   const genderBadgeClass =
@@ -641,11 +641,10 @@ function ConnectionCard({
 
   return (
     <div
-      className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-all hover:border-[#0066CC] hover:shadow-md ${
-        highlighted
+      className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-all hover:border-[#0066CC] hover:shadow-md ${highlighted
           ? "border-[#0066CC] bg-[#F0F7FF]"
           : "border-[#E0E0E0]"
-      }`}
+        }`}
       onClick={onClick}
     >
       <div className="flex gap-3">
