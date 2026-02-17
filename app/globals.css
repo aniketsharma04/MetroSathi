@@ -161,3 +161,26 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* Mobile chat container - uses visual viewport to handle keyboard */
+.chat-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #F8F9FA;
+  /* Use 100% which respects visual viewport on modern browsers */
+  height: 100%;
+  height: 100dvh;
+}
+
+/* When keyboard is open, override dvh with visual viewport height */
+@supports (height: 1dvh) {
+  .chat-fullscreen {
+    height: calc(var(--visual-viewport-height, 100dvh));
+  }
+}

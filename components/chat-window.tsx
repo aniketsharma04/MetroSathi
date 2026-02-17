@@ -37,8 +37,41 @@ export function ChatWindow({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use setTimeout to ensure DOM has updated before scrolling
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   }, []);
+
+  // Track visual viewport height for mobile keyboard handling
+  // Set on documentElement so the parent .chat-fullscreen class can read it
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleResize = () => {
+      // Set CSS variable on :root so .chat-fullscreen parent can use it
+      document.documentElement.style.setProperty(
+        "--visual-viewport-height",
+        `${viewport.height}px`
+      );
+      // Scroll to bottom when keyboard opens (viewport shrinks)
+      scrollToBottom();
+    };
+
+    // Set initial value
+    handleResize();
+
+    viewport.addEventListener("resize", handleResize);
+    viewport.addEventListener("scroll", handleResize);
+
+    return () => {
+      viewport.removeEventListener("resize", handleResize);
+      viewport.removeEventListener("scroll", handleResize);
+      // Clean up the CSS variable
+      document.documentElement.style.removeProperty("--visual-viewport-height");
+    };
+  }, [scrollToBottom]);
 
   // Fetch messages
   const fetchMessages = useCallback(async () => {
@@ -154,11 +187,11 @@ export function ChatWindow({
 
   const initials = otherUser.name
     ? otherUser.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
     : "?";
 
   // Group messages by date
@@ -166,8 +199,8 @@ export function ChatWindow({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-white px-4 py-3">
+      {/* Header - sticky so it stays visible when keyboard opens */}
+      <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b bg-white px-4 py-3">
         <button
           onClick={onBack}
           className="shrink-0 rounded-lg p-1 text-[#666666] hover:bg-[#F1F3F5] md:hidden"
@@ -299,19 +332,17 @@ export function ChatWindow({
 
                     {/* Bubble */}
                     <div
-                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
-                        isMine
-                          ? "rounded-br-md bg-[#0066CC] text-white"
-                          : "rounded-bl-md bg-white text-[#1A1A1A] shadow-sm"
-                      }`}
+                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${isMine
+                        ? "rounded-br-md bg-[#0066CC] text-white"
+                        : "rounded-bl-md bg-white text-[#1A1A1A] shadow-sm"
+                        }`}
                     >
                       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {msg.content}
                       </p>
                       <p
-                        className={`mt-0.5 text-right text-[10px] ${
-                          isMine ? "text-white/60" : "text-[#999999]"
-                        }`}
+                        className={`mt-0.5 text-right text-[10px] ${isMine ? "text-white/60" : "text-[#999999]"
+                          }`}
                       >
                         {formatMessageTime(msg.created_at)}
                       </p>
@@ -325,8 +356,8 @@ export function ChatWindow({
         <div ref={messagesEndRef} />
       </div>}
 
-      {/* Input */}
-      {isConnected && <div className="border-t bg-white px-4 py-3 pb-safe">
+      {/* Input - shrink-0 ensures it stays visible */}
+      {isConnected && <div className="shrink-0 border-t bg-white px-4 py-3 pb-safe">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -336,7 +367,7 @@ export function ChatWindow({
             placeholder="Type a message..."
             rows={1}
             maxLength={500}
-            className="flex-1 resize-none rounded-xl border border-[#E0E0E0] bg-[#F8F9FA] px-4 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#999999] focus:border-[#0066CC] focus:outline-none"
+            className="flex-1 resize-none rounded-xl border border-[#E0E0E0] bg-[#F8F9FA] px-4 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#999999] focus:border-[#0066CC] focus:outline-none scrollbar-hide"
             style={{ maxHeight: "120px" }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
