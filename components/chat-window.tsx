@@ -188,11 +188,11 @@ export function ChatWindow({
 
   const initials = otherUser.name
     ? otherUser.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
     : "?";
 
   // Group messages by date
@@ -333,19 +333,17 @@ export function ChatWindow({
 
                     {/* Bubble */}
                     <div
-                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
-                        isMine
+                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${isMine
                           ? "rounded-br-md bg-[#0066CC] text-white"
                           : "rounded-bl-md bg-white text-[#1A1A1A] shadow-sm"
-                      }`}
+                        }`}
                     >
                       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {msg.content}
                       </p>
                       <p
-                        className={`mt-0.5 text-right text-[10px] ${
-                          isMine ? "text-white/60" : "text-[#999999]"
-                        }`}
+                        className={`mt-0.5 text-right text-[10px] ${isMine ? "text-white/60" : "text-[#999999]"
+                          }`}
                       >
                         {formatMessageTime(msg.created_at)}
                       </p>
@@ -370,7 +368,7 @@ export function ChatWindow({
             placeholder="Type a message..."
             rows={1}
             maxLength={500}
-            className="flex-1 resize-none rounded-xl border border-[#E0E0E0] bg-[#F8F9FA] px-4 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#999999] focus:border-[#0066CC] focus:outline-none"
+            className="flex-1 resize-none rounded-xl border border-[#E0E0E0] bg-[#F8F9FA] px-4 py-2.5 text-sm text-[#1A1A1A] placeholder:text-[#999999] focus:border-[#0066CC] focus:outline-none scrollbar-hide"
             style={{ maxHeight: "120px" }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
