@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { ImageViewer } from "@/components/image-viewer";
 import { toast } from "sonner";
 import type { Gender } from "@/lib/types";
 
@@ -222,19 +223,23 @@ export default function ProfilePage() {
         <div className="flex flex-col items-center rounded-xl bg-white p-6 shadow-sm">
           {/* Avatar */}
           <div className="relative mb-3">
-            <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0]">
-              {displayPic ? (
-                <img
-                  src={displayPic}
-                  alt={profile.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
+            {displayPic ? (
+              <ImageViewer src={displayPic} alt={`${profile.name}'s profile picture`}>
+                <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0] ring-2 ring-transparent transition-all hover:ring-[#0066CC]">
+                  <img
+                    src={displayPic}
+                    alt={profile.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </ImageViewer>
+            ) : (
+              <div className="h-24 w-24 overflow-hidden rounded-full bg-[#E0E0E0]">
                 <div className="flex h-full w-full items-center justify-center bg-[#0066CC] text-2xl font-bold text-white">
                   {initials}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <h1 className="text-xl font-semibold text-[#1A1A1A]">
